@@ -1,0 +1,278 @@
+
+CREATE PROCEDURE "IRRBB_ACCOUNT_CONTRACT_PROC"
+(
+    IN IP_REPORTING_DATE DATE,
+    IN IP_WORKSPACE_NAME NVARCHAR(250),
+    IN IP_WRAP_PROC_SYSUUID NVARCHAR(100)
+)
+LANGUAGE SQLSCRIPT
+SQL SECURITY INVOKER
+AS
+BEGIN
+
+    ------------------------------------------------------------
+    -- 1. DECLARE VARIABLES
+    ------------------------------------------------------------
+
+    DECLARE V_SOURCE_COUNT INTEGER := 0;
+    DECLARE V_TARGET_COUNT INTEGER := 0;
+    DECLARE V_DELETED_COUNT INTEGER := 0;
+    DECLARE V_INSERTED_COUNT INTEGER := 0;
+
+    DECLARE V_START_TIME TIMESTAMP := CURRENT_TIMESTAMP;
+    DECLARE V_END_TIME TIMESTAMP;
+
+    DECLARE ZVAR_DATAPRODUCT NVARCHAR(5000)
+        := 'IRRBB_MI_ACCOUNT_CONTRACT';
+
+    DECLARE V_LOAD_STATUS NVARCHAR(50);
+    DECLARE V_ERROR_CODE NVARCHAR(250);
+    DECLARE V_ERROR_MESSAGE NVARCHAR(250);
+
+    ------------------------------------------------------------
+    -- 2. EXCEPTION HANDLING
+    ------------------------------------------------------------
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+
+        V_ERROR_CODE := ::SQL_ERROR_CODE;
+        V_ERROR_MESSAGE := ::SQL_ERROR_MESSAGE;
+
+        INSERT INTO "IRRBB_ERROR_LOG_T_SYN"
+        VALUES
+        (
+            :ZVAR_DATAPRODUCT,
+            :V_ERROR_CODE,
+            :V_ERROR_MESSAGE,
+            CURRENT_TIMESTAMP
+        );
+
+        RESIGNAL;
+
+    END;
+
+    ------------------------------------------------------------
+    -- 3. GET SOURCE RECORD COUNT
+    ------------------------------------------------------------
+
+    SELECT COUNT(*)
+    INTO V_SOURCE_COUNT
+    FROM "IRRBB_ACCOUNT_CONTRACT_STG_T_SYN"
+    WHERE W_REPORTING_DATE = :IP_REPORTING_DATE
+      AND W_WORKSPACE_NAME = :IP_WORKSPACE_NAME;
+
+    ------------------------------------------------------------
+    -- 4. CHECK SOURCE RECORDS
+    ------------------------------------------------------------
+
+    IF :V_SOURCE_COUNT > 0 THEN
+
+        --------------------------------------------------------
+        -- 5. DELETE EXISTING TARGET RECORDS
+        -- Target does not contain reporting date/workspace.
+        -- Therefore, this is a full target replacement.
+        --------------------------------------------------------
+
+        DELETE FROM "IRRBB_ACCOUNT_CONTRACT_T_SYN";
+
+        V_DELETED_COUNT := ::ROWCOUNT;
+
+        --------------------------------------------------------
+        -- 6. INSERT DATA FROM STAGE TO TARGET
+        -- Explicit datatype conversions are applied.
+        --------------------------------------------------------
+
+        INSERT INTO "IRRBB_ACCOUNT_CONTRACT_T_SYN"
+        (
+            "PARTITION_KEY",
+            "TABLE_NAME",
+            "CONTRACT_REF",
+            "COA_ACCOUNT_NAME",
+            "STATUS4EYES",
+            "FERMAT_ID",
+            "PARTITION_KEY_DATA",
+            "IMPORT_SOURCE",
+            "CHECK_ERROR_NUMBER",
+            "CHECK_DATETIME",
+            "CHECK_CONSTRAINTS",
+            "CHECK_MODE",
+            "CHECK_ERROR_STATUS",
+            "CHECK_ERROR_STATUS_G",
+            "CHECK_ERROR_STATUS_R",
+            "CHECK_ERROR_STATUS_M",
+            "CHECK_ERROR_STATUS_A",
+            "CHECK_ERROR_STATUS_B",
+            "CHECK_ERROR_STATUS_K",
+            "CHECK_ERROR_STATUS_S",
+            "CHECK_ERROR_STATUS_L",
+            "CHECK_ERROR_STATUS_O",
+            "CHECK_ERROR_STATUS_T",
+            "CHECK_ERROR_STATUS_W",
+            "CHECK_ERROR_STATUS_Y",
+            "CHECK_ERROR_STATUS_D",
+            "CHECK_ERROR_STATUS_V",
+            "CHECK_ERROR_STATUS_X",
+            "CHECK_ERROR_STATUS_Z",
+            "CHECK_ERROR_STATUS_F",
+            "CHECK_ERROR_STATUS_E"
+        )
+
+        SELECT
+
+            ----------------------------------------------------
+            -- VARCHAR2 COLUMNS
+            ----------------------------------------------------
+
+            CAST("PARTITION_KEY" AS VARCHAR(12)),
+            CAST("TABLE_NAME" AS VARCHAR(30)),
+            CAST("CONTRACT_REF" AS VARCHAR(101)),
+            CAST("COA_ACCOUNT_NAME" AS VARCHAR(100)),
+
+            ----------------------------------------------------
+            -- CHAR(1) COLUMN
+            ----------------------------------------------------
+
+            CAST("STATUS4EYES" AS CHAR(1)),
+
+            ----------------------------------------------------
+            -- NUMBER COLUMN
+            ----------------------------------------------------
+
+            TO_DECIMAL(
+                NULLIF(TRIM("FERMAT_ID"), ''),
+                38,
+                0
+            ),
+
+            ----------------------------------------------------
+            -- VARCHAR2 COLUMNS
+            ----------------------------------------------------
+
+            CAST("PARTITION_KEY_DATA" AS VARCHAR(12)),
+            CAST("IMPORT_SOURCE" AS VARCHAR(20)),
+
+            ----------------------------------------------------
+            -- NUMBER(5) COLUMN
+            ----------------------------------------------------
+
+            TO_DECIMAL(
+                NULLIF(TRIM("CHECK_ERROR_NUMBER"), ''),
+                5,
+                0
+            ),
+
+            ----------------------------------------------------
+            -- DATE COLUMN
+            -- Source format: YYYY-MM-DD
+            ----------------------------------------------------
+
+            TO_DATE(
+                NULLIF(TRIM("CHECK_DATETIME"), ''),
+                'YYYY-MM-DD'
+            ),
+
+            ----------------------------------------------------
+            -- CHAR(1) COLUMNS
+            ----------------------------------------------------
+
+            CAST("CHECK_CONSTRAINTS" AS CHAR(1)),
+            CAST("CHECK_MODE" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_G" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_R" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_M" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_A" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_B" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_K" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_S" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_L" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_O" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_T" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_W" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_Y" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_D" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_V" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_X" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_Z" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_F" AS CHAR(1)),
+            CAST("CHECK_ERROR_STATUS_E" AS CHAR(1))
+
+        FROM "IRRBB_ACCOUNT_CONTRACT_STG_T_SYN"
+
+        WHERE W_REPORTING_DATE = :IP_REPORTING_DATE
+          AND W_WORKSPACE_NAME = :IP_WORKSPACE_NAME;
+
+        --------------------------------------------------------
+        -- 7. CAPTURE INSERTED RECORD COUNT
+        --------------------------------------------------------
+
+        V_INSERTED_COUNT := ::ROWCOUNT;
+
+    ELSE
+
+        --------------------------------------------------------
+        -- 8. NO SOURCE RECORDS
+        --------------------------------------------------------
+
+        INSERT INTO "IRRBB_ERROR_LOG_T_SYN"
+        VALUES
+        (
+            :ZVAR_DATAPRODUCT,
+            'No_Records',
+            'NO RECORDS IN STAGE TABLE',
+            CURRENT_TIMESTAMP
+        );
+
+    END IF;
+
+    ------------------------------------------------------------
+    -- 9. GET FINAL TARGET COUNT
+    ------------------------------------------------------------
+
+    SELECT COUNT(*)
+    INTO V_TARGET_COUNT
+    FROM "IRRBB_ACCOUNT_CONTRACT_T_SYN";
+
+    ------------------------------------------------------------
+    -- 10. VALIDATE RECORD COUNTS
+    ------------------------------------------------------------
+
+    IF :V_SOURCE_COUNT = 0 THEN
+
+        V_LOAD_STATUS := 'NO SOURCE RECORDS';
+
+    ELSEIF :V_SOURCE_COUNT = :V_INSERTED_COUNT
+       AND :V_INSERTED_COUNT = :V_TARGET_COUNT THEN
+
+        V_LOAD_STATUS := 'SUCCESS';
+
+    ELSE
+
+        V_LOAD_STATUS := 'COUNT MISMATCH';
+
+    END IF;
+
+    ------------------------------------------------------------
+    -- 11. CAPTURE END TIME
+    ------------------------------------------------------------
+
+    V_END_TIME := CURRENT_TIMESTAMP;
+
+    ------------------------------------------------------------
+    -- 12. DISPLAY EXECUTION SUMMARY
+    ------------------------------------------------------------
+
+    SELECT
+        'IRRBB_ACCOUNT_CONTRACT_PROC' AS PROCEDURE_NAME,
+        :IP_REPORTING_DATE AS REPORTING_DATE,
+        :IP_WORKSPACE_NAME AS WORKSPACE_NAME,
+        :V_SOURCE_COUNT AS SOURCE_COUNT,
+        :V_DELETED_COUNT AS DELETED_COUNT,
+        :V_INSERTED_COUNT AS INSERTED_COUNT,
+        :V_TARGET_COUNT AS TARGET_COUNT,
+        :V_LOAD_STATUS AS LOAD_STATUS,
+        :V_START_TIME AS START_TIME,
+        :V_END_TIME AS END_TIME;
+
+END;
